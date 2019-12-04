@@ -10,7 +10,22 @@ public class UserStkNotifRequestDto {
 	int notifId;
 	char notifSubsStatus;
 	int notificationFactor;
+	int stkId;
+	public int getNoOfStks() {
+		return noOfStks;
+	}
+	public void setNoOfStks(int noOfStks) {
+		this.noOfStks = noOfStks;
+	}
+
+	int noOfStks;
 	
+	public int getStkId() {
+		return stkId;
+	}
+	public void setStkId(int stkId) {
+		this.stkId = stkId;
+	}
 	public int getNotificationFactor() {
 		return notificationFactor;
 	}

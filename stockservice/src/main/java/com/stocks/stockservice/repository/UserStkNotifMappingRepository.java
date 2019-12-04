@@ -16,4 +16,6 @@ public interface UserStkNotifMappingRepository extends JpaRepository<UserStkNoti
 	List<UserStkNotifMapping> findByUserId(long userId);
 	
 	List<UserStkNotifMapping> findBySubscriptionStatus(char subscriptionStatus);
+
+	List<UserStkNotifMapping> findByUserIdAndStkId(long userId,long stkId);
 }

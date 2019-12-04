@@ -1,5 +1,7 @@
 package com.stocks.stockservice.service;
 
+import java.util.NoSuchElementException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,8 +25,12 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public StockServiceUser getUser(long userId) {
-		StockServiceUser user = userRepository.findById(userId).get();
-		return user;
+		try {
+			StockServiceUser user = userRepository.findById(userId).get();
+			return user;
+		} catch (Exception ex) {
+			throw new NoSuchElementException("Invalid userId");
+		}
 	}
 
 	@Override

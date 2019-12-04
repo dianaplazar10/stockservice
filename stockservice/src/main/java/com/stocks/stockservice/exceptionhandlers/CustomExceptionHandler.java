@@ -1,6 +1,7 @@
 package com.stocks.stockservice.exceptionhandlers;
 
 import java.util.Date;
+import java.util.NoSuchElementException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,4 +41,16 @@ public class CustomExceptionHandler extends ResponseEntityExceptionHandler {
 		return new ResponseEntity<>(
 				errorMessage, new HttpHeaders(),HttpStatus.INTERNAL_SERVER_ERROR);
 	}
+	
+	@ExceptionHandler(value= {NoSuchElementException.class})
+	public ResponseEntity<Object> handleAllAppException(NoSuchElementException ex, WebRequest request) {
+		String localizedErrMsg = ex.getLocalizedMessage()==null ?
+				ex.toString() : ex.getLocalizedMessage();
+		
+		ErrorMessageDto errorMessage = new ErrorMessageDto(new Date(), localizedErrMsg);
+		
+		return new ResponseEntity<>(
+				errorMessage, new HttpHeaders(),HttpStatus.NOT_FOUND);
+	}
+	
 }

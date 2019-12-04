@@ -16,7 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.stocks.stockservice.dto.AppConstants;
 import com.stocks.stockservice.dto.UserStkNotifRequestDto;
 import com.stocks.stockservice.exceptionhandlers.CustomRuntimeException;
+import com.stocks.stockservice.model.Stock;
+import com.stocks.stockservice.model.StockServiceUser;
 import com.stocks.stockservice.model.UserStkNotifMapping;
+import com.stocks.stockservice.service.StockService;
+import com.stocks.stockservice.service.UserService;
 import com.stocks.stockservice.service.UserStockNotifService;
 
 @RestController
@@ -27,16 +31,43 @@ public class UserStkNotifMappingController {
 	@Autowired
 	private UserStockNotifService userStockNotifService;
 	
-	@PostMapping(value="/addstocks")
+	@Autowired
+	private UserService userService;
+	
+	@Autowired
+	private StockService stockService;
+	
+	@PostMapping(value="/addstock")
 	public ResponseEntity<Object> addStocksToUser(@RequestBody UserStkNotifRequestDto usnDto) {
-		if(usnDto.getUserId()==0) {
-			throw new CustomRuntimeException("Invalid User Id:" + usnDto.getUserId());
+		StockServiceUser user = validateUserId(usnDto);
+		Stock stk = validateStockId(usnDto);
+		if(usnDto.getNoOfStks() == 0) { // can have negative values as well to indicate stocks sold
+			throw new CustomRuntimeException("Invalid No of Stocks");
 		}
-		if(usnDto.getStockIds().isEmpty()) {
-			throw new CustomRuntimeException("No Stocks to add to the User account with id :" + usnDto.getUserId());
-		}
-		userStockNotifService.addStocks(usnDto.getUserId(), usnDto.getStockIds());
+		userStockNotifService.addStockToUser(usnDto.getUserId(), usnDto.getStkId(), usnDto.getNoOfStks());//(usnDto.getUserId(), usnDto.getStockIds());
 		return ResponseEntity.ok().build(); 
+	}
+
+	private Stock validateStockId(UserStkNotifRequestDto usnDto) {
+		if(usnDto.getStkId() == 0) {
+			throw new CustomRuntimeException("Invalid Stock Id");
+		}
+		Stock stock = stockService.getStock(usnDto.getStkId());
+		if(stock == null) {
+			throw new CustomRuntimeException("Invalid Stock Id");
+		}
+		return stock;
+	}
+
+	private StockServiceUser validateUserId(UserStkNotifRequestDto usnDto) {
+		if(usnDto.getUserId() == 0) {
+			throw new CustomRuntimeException("Invalid User Id");
+		}
+		StockServiceUser user = userService.getUser((long) usnDto.getUserId());
+		if(user == null) {
+			throw new CustomRuntimeException("Invalid User Id");
+		}
+		return user;
 	}
 	
 	@PostMapping(value="/subscribe")

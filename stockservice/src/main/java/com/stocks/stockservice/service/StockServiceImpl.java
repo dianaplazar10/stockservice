@@ -1,6 +1,7 @@
 package com.stocks.stockservice.service;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import com.stocks.stockservice.exceptionhandlers.CustomRuntimeException;
 import com.stocks.stockservice.model.Stock;
+import com.stocks.stockservice.model.StockServiceUser;
 import com.stocks.stockservice.repository.StockRepository;
 
 @Component
@@ -33,12 +35,12 @@ public class StockServiceImpl implements StockService {
 
 	@Override
 	public Stock getStock(long stockId) {
-		Stock stk = stockRepository.findById(stockId).get();
-		if(stk==null) {
-			throw new CustomRuntimeException("No Stock with the given Stock Id: " 
-					+ stockId);
+		try {
+			Stock stk = stockRepository.findById(stockId).get();
+			return stk;
+		} catch (Exception ex) {
+			throw new NoSuchElementException("Invalid Stock Id");
 		}
-		return stk;
 	}
 
 	@Override

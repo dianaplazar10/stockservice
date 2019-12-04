@@ -9,7 +9,7 @@ import com.stocks.stockservice.model.UserStkNotifMapping;
 @Service
 public interface UserStockNotifService {
 	
-	void addStocks(int userId, List<Integer> stkIds);
+//	void addStocks(int userId, List<Integer> stkIds);
 	void subscribeToNotification(int userId, int notificationId,
 			char notificationSubscrStatus,
 			int notificationFactor);
@@ -18,5 +18,6 @@ public interface UserStockNotifService {
 	List<UserStkNotifMapping> getAllNotificationForUser(int userId);
 	
 	void updateUSNmappings(List<UserStkNotifMapping> usnMappings);
+	void addStockToUser(int userId, int stkId, int stkCount);
 
 }

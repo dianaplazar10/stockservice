@@ -18,10 +18,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import com.stocks.stockservice.dto.AppConstants;
 import com.stocks.stockservice.exceptionhandlers.CustomRuntimeException;
+import com.stocks.stockservice.model.Holdings;
 import com.stocks.stockservice.model.Stock;
 import com.stocks.stockservice.model.UserStkNotifMapping;
+import com.stocks.stockservice.service.HoldingsService;
 import com.stocks.stockservice.service.StockService;
 import com.stocks.stockservice.service.UserStockNotifService;
+import com.stocks.stockservice.utils.HoldingsUtil;
 
 @Configuration
 @EnableScheduling
@@ -39,6 +42,11 @@ public class StockDailyUpdateService {
 	
 	@Autowired
 	private UserStockNotifService userStockNotifService;
+	@Autowired
+	private HoldingsService holdingsService;
+	
+	private HoldingsUtil holdingsUtil = new HoldingsUtil();
+
     
 	/*
 	 * refer crontab.guru to understand more about cron paramenters
@@ -47,14 +55,13 @@ public class StockDailyUpdateService {
 	
 	@Scheduled(cron = "1 * * * * *", zone = "CET")//1 00 * * *
 	void customJob() throws InterruptedException {
-		updateStocksforDailyAveragePrice();
-	}
-
-	private void updateStocksforDailyAveragePrice() {
 		List<Stock> listOfStocks = stockService.getAll();
 		Map<Long, Stock> stocksMap = listOfStocks.stream()
 			      .collect(Collectors.toMap(Stock::getStockId, stock ->(Stock) stock));
-		
+		updateStocksforDailyAveragePrice(stocksMap);
+	}
+
+	private void updateStocksforDailyAveragePrice(Map<Long, Stock> stocksMap ) {
 		List<UserStkNotifMapping> listOfUSNmapping = userStockNotifService.getAllSubscribedMappings();
 		List<UserStkNotifMapping> updatedListOfUSNmapping = new ArrayList<UserStkNotifMapping>();
 
@@ -78,14 +85,47 @@ public class StockDailyUpdateService {
 			LOGGER.info("Current Local time :" +currentETime);
 			throw new CustomRuntimeException("");
 		}
-		logJobCompletion();
+		logJobCompletion("::: Cron completed to update new base stock price in the DWH :::");
+	}
+	
+	private void updateStockDayBasePriceInHoldings(Map<Long, Stock> stocksMap ) {
+		List<Holdings> holdingsToUpdate = new ArrayList<Holdings>();
+		for(Map.Entry<Long, Stock> entry : stocksMap.entrySet()) {
+			int stockId = entry.getKey().intValue();
+			List<Holdings> listHoldingsForStock = holdingsService.getAllHoldingsForStockId(stockId);
+			if(!listHoldingsForStock.isEmpty()) {
+				listHoldingsForStock.forEach(holding -> holding.setStkBasePriceToday(entry.getValue().getCurrentStockPrice()));
+				//Update Change and GL percentage for each holdings
+				for(Holdings holding : listHoldingsForStock) {
+					Stock stk = entry.getValue();
+					holding = holdingsUtil.calcChangeGLpercentage(0, stk, holding);// No: of stocks =0 to indicate that its n0t a new holding
+					if(holding.getAvgStockPrice() != stk.getCurrentStockPrice()) {
+						
+						holdingsService.removeHolding(holding.getHoldingsid());
+	
+						holdingsService.createHolding(holding);	
+					}
+				}
+				holdingsToUpdate.addAll(listHoldingsForStock);
+			}
+		}
+		holdingsService.updateHoldings(holdingsToUpdate);
+		logJobCompletion("::: Cron completed to update new base stock price in Holdings :::");
 	}
 
-	private void logJobCompletion() {
+	private void logJobCompletion(String logMsg) {
 			
-		LOGGER.info("::: Cron completed to update new base stock price in the DWH :::");
+		LOGGER.info(logMsg);
 		LOGGER.info("Current server time :" + currentDateTime);
 		LOGGER.info("Current Local time :" +currentETime);
+	}
+	
+	@Scheduled(cron = "1 * * * * *", zone = "CET")//1 00 * * *
+	void holdingsGLupdateJob() throws InterruptedException {
+		List<Stock> listOfStocks = stockService.getAll();
+		Map<Long, Stock> stocksMap = listOfStocks.stream()
+			      .collect(Collectors.toMap(Stock::getStockId, stock ->(Stock) stock));
+		updateStockDayBasePriceInHoldings(stocksMap);
 	}
 	
 }

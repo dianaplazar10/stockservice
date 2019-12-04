@@ -12,9 +12,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.stocks.stockservice.dto.AppConstants;
+import com.stocks.stockservice.model.Holdings;
 import com.stocks.stockservice.model.Stock;
 import com.stocks.stockservice.model.UserStkNotifMapping;
+import com.stocks.stockservice.repository.HoldingsRepository;
 import com.stocks.stockservice.repository.UserStkNotifMappingRepository;
+import com.stocks.stockservice.utils.HoldingsUtil;
 
 @Component
 public class UserStockNotifServiceImpl implements UserStockNotifService {
@@ -25,14 +28,55 @@ public class UserStockNotifServiceImpl implements UserStockNotifService {
 	private UserStkNotifMappingRepository userStkNotifMappingRepository;
 	
 	@Autowired
+	private HoldingsService holdingsService;
+	
+	@Autowired
 	private StockService stockService;
+	
+	private HoldingsUtil holdingsUtil = new HoldingsUtil();
 
+	/*
 	@Override
 	public void addStocks(int userId, List<Integer> stkIds) {
 		List<UserStkNotifMapping> listMappings = new ArrayList<UserStkNotifMapping>();
-		//check if mappings already exist
+		//check if mappings already exist, if exists, then increment count in holdings DB
 		stkIds = filterOutAlreadyAddedStocks(userId, stkIds);
 		
+		listMappings = updateUSNmappings(userId, stkIds, listMappings);
+		if(!listMappings.isEmpty()) {
+			userStkNotifMappingRepository.saveAll(listMappings);
+		}
+	}
+	*/
+	
+	@Override
+	public void addStockToUser(int userId, int stkId, int stkCount) {
+		List<UserStkNotifMapping> existingStocks = userStkNotifMappingRepository.findByUserIdAndStkId((long) userId,(long) stkId);
+		Stock stock = stockService.getStock(stkId);
+		if(existingStocks.isEmpty()) {
+			UserStkNotifMapping usnMap = new UserStkNotifMapping(userId, stkId, AppConstants.INVALID_DEFAULT_NOTIFICATION_ID, 
+					AppConstants.SUBSCR_STAT_Y, AppConstants.INVALID_DEFAULT_NOTIFICATION_FACTOR, stock.getCurrentStockPrice());
+			userStkNotifMappingRepository.save(usnMap);
+			double costBasis = stkCount*stock.getCurrentStockPrice();
+			Holdings holding = new Holdings(userId, stkId, stkCount, stock.getCurrentStockPrice(), stock.getCurrentStockPrice(), 
+											AppConstants.DEFAULT_CHANGE_PERCENTAGE, AppConstants.DEFAULT_TOTAL_GL_PERCENTAGE,costBasis);
+			holdingsService.createHolding(holding);			
+		} else {
+			List<Holdings> listHolding = holdingsService.getHoldingForUsrIdStkId(userId,stkId);
+			for(Holdings hold : listHolding) {
+//				if(hold.getAvgStockPrice() != stock.getCurrentStockPrice()) {
+					hold = holdingsUtil.calcChangeGLpercentage(stkCount, stock, hold);
+					
+					holdingsService.removeHolding(hold.getHoldingsid());
+	
+					holdingsService.createHolding(hold);	
+//				}
+			}
+		}
+	}
+	
+
+	private List<UserStkNotifMapping> updateUSNmappings(int userId, List<Integer> stkIds, List<UserStkNotifMapping> listMappings) {
 		if(!stkIds.isEmpty()) {
 			List<Stock> stocks = stockService.getStocksIn(stkIds);
 			Map<Long, Stock> stocksMap = stocks.stream()
@@ -46,25 +90,28 @@ public class UserStockNotifServiceImpl implements UserStockNotifService {
 				listMappings.add(usnMapping);
 			}
 		}
-		if(!listMappings.isEmpty()) {
-			userStkNotifMappingRepository.saveAll(listMappings);
-		}
+		return listMappings;
 	}
 
-	private List<Integer> filterOutAlreadyAddedStocks(int userId, List<Integer> stkIds) {
-		List<Integer> filteredStkIds = new ArrayList<Integer>();
+	private List<List<Integer>> identifyAlreadyAddedStocks(int userId, List<Integer> stkIds) {
+		List<List<Integer>> listOfStkIds = new ArrayList<List<Integer>>();
+		List<Integer> newStks = new ArrayList<Integer>();
+		List<Integer> existingStks = new ArrayList<Integer>();
 		List<UserStkNotifMapping> existingStocks = userStkNotifMappingRepository.findByUserId(userId);
 		if(!existingStocks.isEmpty()) {
 			Set<Long> setExistingStkIds = existingStocks.stream().map(x->x.getStkId()).collect(Collectors.toSet());
 			for(int i=0; i<stkIds.size();i++) {
 				if(!setExistingStkIds.contains((long) stkIds.get(i))) {
-					filteredStkIds.add(stkIds.get(i));
+					existingStks.add(stkIds.get(i));
+				} else {
+					newStks.add(stkIds.get(i));
 				}
 			}
 		} else {
-			filteredStkIds = stkIds;
+			listOfStkIds.add(new ArrayList<Integer>());
+			listOfStkIds.add(stkIds);
 		}
-		return filteredStkIds;
+		return listOfStkIds;
 	}
 
 	@Override
